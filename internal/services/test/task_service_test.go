@@ -77,8 +77,8 @@ func TestTaskServiceCreateAssignsDefaultsAndTrimsFields(t *testing.T) {
 	dueDate := time.Now().UTC().AddDate(0, 0, 3).Format("2006-01-02")
 
 	createdTask, err := taskService.Create(context.Background(), models.CreateTaskInput{
-		Title:       "Estudar testes",
-		Description: "Estudar testes unitarios e de integracao",
+		Title:       "  Escrever testes  ",
+		Description: "  Cobrir regras de negocio  ",
 		Priority:    "high",
 		DueDate:     dueDate,
 	})
