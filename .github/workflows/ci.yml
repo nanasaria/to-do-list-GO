@@ -10,6 +10,11 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -24,4 +29,8 @@ jobs:
             exit 1
           fi
       - run: go test ./... -v
+      - name: go test e2e
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017
+        run: go test -tags=e2e ./test/e2e -v
       - run: go build ./...
