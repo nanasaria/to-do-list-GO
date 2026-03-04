@@ -98,7 +98,7 @@ func openAPISpec() map[string]any {
 									"title":       "Estudar Golang",
 									"description": "Revisar conceitos de goroutines",
 									"priority":    "high",
-									"due_date":    "2026-02-10",
+									"due_date":    "2030-02-10",
 								},
 							},
 						},
@@ -126,8 +126,19 @@ func openAPISpec() map[string]any {
 					},
 				},
 				"put": map[string]any{
-					"summary":     "Atualizar tarefa",
+					"summary":     "Atualizar tarefa com payload parcial",
 					"operationId": "updateTaskPut",
+					"requestBody": updateTaskRequestBody(),
+					"responses": map[string]any{
+						"200": successResponse("Tarefa atualizada", "#/components/schemas/Task"),
+						"400": errorResponse("Payload inválido"),
+						"404": errorResponse("Tarefa não encontrada"),
+						"409": errorResponse("Tarefa concluída não pode ser editada"),
+					},
+				},
+				"patch": map[string]any{
+					"summary":     "Atualizar parcialmente tarefa",
+					"operationId": "updateTaskPatch",
 					"requestBody": updateTaskRequestBody(),
 					"responses": map[string]any{
 						"200": successResponse("Tarefa atualizada", "#/components/schemas/Task"),
@@ -363,7 +374,8 @@ func errorResponse(description string) map[string]any {
 
 func updateTaskRequestBody() map[string]any {
 	return map[string]any{
-		"required": true,
+		"required":    true,
+		"description": "Aceita atualizacao parcial. Informe pelo menos um campo.",
 		"content": map[string]any{
 			"application/json": map[string]any{
 				"schema": map[string]any{

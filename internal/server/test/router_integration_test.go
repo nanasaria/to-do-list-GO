@@ -370,6 +370,48 @@ func TestRouterUpdateCompletedTaskReturnsConflict(t *testing.T) {
 	assertJSONError(t, httpResponse.Body, services.ErrTaskCompleted.Error())
 }
 
+func TestRouterPatchTaskUpdatesTask(t *testing.T) {
+	t.Parallel()
+
+	task := models.Task{
+		ID:        utils.NewUUID(),
+		Title:     "Task editavel",
+		Status:    models.TaskStatusPending,
+		Priority:  models.TaskPriorityMedium,
+		DueDate:   time.Now().UTC().AddDate(0, 0, 2),
+		CreatedAt: time.Now().UTC().Add(-2 * time.Hour),
+		UpdatedAt: time.Now().UTC().Add(-1 * time.Hour),
+	}
+
+	taskRepository := newInMemoryTaskRepository(task)
+	httpHandler := newTestRouter(taskRepository)
+
+	httpRequest := httptest.NewRequest(http.MethodPatch, "/tasks/"+task.ID, marshalJSON(t, map[string]string{
+		"priority": "high",
+	}))
+	httpRequest.Header.Set("Content-Type", "application/json")
+	httpResponse := httptest.NewRecorder()
+
+	httpHandler.ServeHTTP(httpResponse, httpRequest)
+
+	if httpResponse.Code != http.StatusOK {
+		t.Fatalf("ServeHTTP() status = %d, want %d", httpResponse.Code, http.StatusOK)
+	}
+
+	updatedTask, err := taskRepository.GetByID(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetByID() returned error: %v", err)
+	}
+
+	if updatedTask.Priority != models.TaskPriorityHigh {
+		t.Fatalf("updated task priority = %q, want %q", updatedTask.Priority, models.TaskPriorityHigh)
+	}
+
+	if updatedTask.Title != task.Title {
+		t.Fatalf("updated task title = %q, want %q", updatedTask.Title, task.Title)
+	}
+}
+
 func TestRouterUpdateRejectsInvalidStatus(t *testing.T) {
 	t.Parallel()
 

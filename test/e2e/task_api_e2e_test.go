@@ -210,6 +210,54 @@ func TestTaskAPIE2EUpdateTaskPersistsChanges(t *testing.T) {
 	}
 }
 
+func TestTaskAPIE2EPatchTaskPersistsChanges(t *testing.T) {
+	t.Parallel()
+
+	testEnvironment := newE2ETestApp(t)
+	initialTaskDocument := newTaskFixture("Atualizar parcialmente tarefa", models.TaskStatusPending, models.TaskPriorityMedium, 1)
+	testEnvironment.insertTaskFixture(t, initialTaskDocument)
+
+	updatePayload := map[string]string{
+		"description": "Descricao ajustada via patch",
+		"priority":    "high",
+	}
+
+	updateHTTPResponse := testEnvironment.doJSONRequest(t, http.MethodPatch, "/tasks/"+initialTaskDocument.ID, updatePayload)
+	defer updateHTTPResponse.Body.Close()
+
+	if updateHTTPResponse.StatusCode != http.StatusOK {
+		t.Fatalf("PATCH /tasks/{id} status = %d, want %d", updateHTTPResponse.StatusCode, http.StatusOK)
+	}
+
+	var updatedTaskResponse taskResponse
+	decodeJSONResponse(t, updateHTTPResponse.Body, &updatedTaskResponse)
+
+	if updatedTaskResponse.Priority != "high" {
+		t.Fatalf("PATCH /tasks/{id} priority = %q, want %q", updatedTaskResponse.Priority, "high")
+	}
+
+	if updatedTaskResponse.Description != updatePayload["description"] {
+		t.Fatalf("PATCH /tasks/{id} description = %q, want %q", updatedTaskResponse.Description, updatePayload["description"])
+	}
+
+	updatedTaskDocument := testEnvironment.findTaskInMongo(t, initialTaskDocument.ID)
+	if updatedTaskDocument.Description != updatePayload["description"] {
+		t.Fatalf("stored task description = %q, want %q", updatedTaskDocument.Description, updatePayload["description"])
+	}
+
+	if updatedTaskDocument.Priority != models.TaskPriorityHigh {
+		t.Fatalf("stored task priority = %q, want %q", updatedTaskDocument.Priority, models.TaskPriorityHigh)
+	}
+
+	if updatedTaskDocument.Title != initialTaskDocument.Title {
+		t.Fatalf("stored task title = %q, want %q", updatedTaskDocument.Title, initialTaskDocument.Title)
+	}
+
+	if updatedTaskDocument.Status != initialTaskDocument.Status {
+		t.Fatalf("stored task status = %q, want %q", updatedTaskDocument.Status, initialTaskDocument.Status)
+	}
+}
+
 func TestTaskAPIE2EUpdateCompletedTaskReturnsConflict(t *testing.T) {
 	t.Parallel()
 
@@ -236,6 +284,35 @@ func TestTaskAPIE2EUpdateCompletedTaskReturnsConflict(t *testing.T) {
 	unchangedTaskDocument := testEnvironment.findTaskInMongo(t, completedTaskDocument.ID)
 	if unchangedTaskDocument.Title != completedTaskDocument.Title {
 		t.Fatalf("stored task title = %q, want %q", unchangedTaskDocument.Title, completedTaskDocument.Title)
+	}
+}
+
+func TestTaskAPIE2EPatchCompletedTaskReturnsConflict(t *testing.T) {
+	t.Parallel()
+
+	testEnvironment := newE2ETestApp(t)
+	completedTaskDocument := newTaskFixture("Tarefa concluida via patch", models.TaskStatusCompleted, models.TaskPriorityHigh, 1)
+	testEnvironment.insertTaskFixture(t, completedTaskDocument)
+
+	updateHTTPResponse := testEnvironment.doJSONRequest(t, http.MethodPatch, "/tasks/"+completedTaskDocument.ID, map[string]string{
+		"priority": "low",
+	})
+	defer updateHTTPResponse.Body.Close()
+
+	if updateHTTPResponse.StatusCode != http.StatusConflict {
+		t.Fatalf("PATCH /tasks/{id} status = %d, want %d", updateHTTPResponse.StatusCode, http.StatusConflict)
+	}
+
+	var apiErrorResponse errorResponse
+	decodeJSONResponse(t, updateHTTPResponse.Body, &apiErrorResponse)
+
+	if apiErrorResponse.Error != services.ErrTaskCompleted.Error() {
+		t.Fatalf("PATCH /tasks/{id} error = %q, want %q", apiErrorResponse.Error, services.ErrTaskCompleted.Error())
+	}
+
+	unchangedTaskDocument := testEnvironment.findTaskInMongo(t, completedTaskDocument.ID)
+	if unchangedTaskDocument.Priority != completedTaskDocument.Priority {
+		t.Fatalf("stored task priority = %q, want %q", unchangedTaskDocument.Priority, completedTaskDocument.Priority)
 	}
 }
 

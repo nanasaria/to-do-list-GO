@@ -10,7 +10,7 @@ O projeto permite criar, listar, consultar, atualizar e remover tarefas, com val
 - Listagem paginada de tarefas.
 - Filtro de tarefas por status e prioridade.
 - Busca de tarefa por ID.
-- Atualizacao parcial de tarefa existente.
+- Atualizacao parcial de tarefa existente via `PUT` ou `PATCH`.
 - Remocao de tarefa por ID.
 - Health check da aplicacao em `/health`.
 - Documentacao interativa em `/swagger`.
@@ -41,7 +41,8 @@ O projeto permite criar, listar, consultar, atualizar e remover tarefas, com val
 | `GET` | `/tasks` | Lista tarefas com filtros e paginacao |
 | `POST` | `/tasks` | Cria uma nova tarefa |
 | `GET` | `/tasks/{id}` | Busca uma tarefa por ID |
-| `PUT` | `/tasks/{id}` | Atualiza uma tarefa |
+| `PUT` | `/tasks/{id}` | Atualiza uma tarefa com payload parcial |
+| `PATCH` | `/tasks/{id}` | Atualiza parcialmente uma tarefa |
 | `DELETE` | `/tasks/{id}` | Remove uma tarefa |
 
 ### Parametros da listagem
@@ -70,7 +71,7 @@ curl "http://localhost:8080/tasks?status=pending&priority=high&page=1&page_size=
 }
 ```
 
-### Atualizar tarefa
+### Atualizar tarefa (`PUT` ou `PATCH`)
 
 ```json
 {
@@ -78,6 +79,12 @@ curl "http://localhost:8080/tasks?status=pending&priority=high&page=1&page_size=
   "priority": "medium"
 }
 ```
+
+## Collection do Postman
+
+Colecao compartilhada para testar a API:
+
+[Abrir collection no Postman](https://nayara-ec9ace9e-307899.postman.co/workspace/Nayara-Nasaria%27s-Workspace~9cf6a391-10ca-4120-8a0a-921c270cf40f/collection/52886423-b8a31fce-e515-447b-ba6e-52061276b6d4?action=share&creator=52886423)
 
 ## Tecnologias
 
