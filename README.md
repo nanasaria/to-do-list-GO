@@ -15,6 +15,7 @@ O projeto permite criar, listar, consultar, atualizar e remover tarefas, com val
 - Health check da aplicacao em `/health`.
 - Documentacao interativa em `/swagger`.
 - Logs estruturados com `X-Request-ID` em todas as requisicoes.
+- Suite de testes unitarios, integracao HTTP e E2E com MongoDB.
 
 ## Regras de negocio
 
@@ -157,7 +158,7 @@ Resposta esperada:
 .
 |-- main.go
 |-- docker-compose.yml
-`-- internal
+|-- internal
     |-- config
     |-- controllers
     |-- database
@@ -167,8 +168,12 @@ Resposta esperada:
     |-- models
     |-- repositories
     |-- server
+    |   `-- test
     |-- services
+    |   `-- test
     `-- utils
+`-- test
+    `-- e2e
 ```
 
 Resumo das camadas:
@@ -179,6 +184,53 @@ Resumo das camadas:
 - `docs`: expoe Swagger UI e OpenAPI.
 - `server`: configura rotas e middleware.
 
+Arquivos de teste:
+
+- `internal/services/test/task_service_test.go`: testes unitarios das regras de negocio.
+- `internal/server/test/router_integration_test.go`: testes de integracao HTTP com repositorio em memoria.
+- `test/e2e/task_api_e2e_test.go`: testes E2E com MongoDB real e servidor HTTP completo.
+
+## Testes
+
+### O que esta coberto
+
+- Regras de negocio de criacao, atualizacao e exclusao.
+- Validacao de titulo, prioridade, status e `due_date`.
+- Bloqueio de edicao de tarefas com status `completed`.
+- Filtros e paginacao na listagem.
+- Fluxo completo dos endpoints com persistencia real no MongoDB.
+
+### Rodar testes unitarios e de integracao
+
+```bash
+go test ./...
+```
+
+### Rodar testes E2E
+
+Os testes E2E usam a build tag `e2e` e exigem MongoDB disponivel.
+
+1. Suba o MongoDB:
+
+```bash
+docker compose up -d mongo
+```
+
+2. Rode os testes:
+
+```bash
+MONGO_URI=mongodb://127.0.0.1:27017 go test -tags=e2e ./test/e2e -v
+```
+
+### CI
+
+A pipeline em `.github/workflows/ci.yml` executa:
+
+- verificacao de formatacao com `gofmt`
+- `go test ./... -v`
+- testes E2E com `go test -tags=e2e ./test/e2e -v`
+- `go build ./...`
+
 ## Verificacao
 
 O projeto foi validado com:
@@ -187,4 +239,10 @@ O projeto foi validado com:
 go test ./...
 ```
 
-No estado atual, todos os pacotes compilam e nao ha arquivos de teste automatizado.
+E para a suite E2E:
+
+```bash
+go test -tags=e2e ./test/e2e -run '^$'
+```
+
+No estado atual, os testes automatizados incluem unitarios, integracao HTTP e E2E.
