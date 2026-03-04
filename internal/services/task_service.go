@@ -20,8 +20,11 @@ var (
 )
 
 const (
-	minTaskTitleLength = 3
-	maxTaskTitleLength = 100
+	minTaskTitleLength  = 3
+	maxTaskTitleLength  = 100
+	defaultTaskListPage = 1
+	defaultTaskPageSize = 10
+	maxTaskPageSize     = 100
 )
 
 type ValidationError struct {
@@ -34,7 +37,7 @@ func (e *ValidationError) Error() string {
 
 type TaskService interface {
 	Create(ctx context.Context, input models.CreateTaskInput) (*models.Task, error)
-	List(ctx context.Context, input models.ListTaskInput) ([]models.Task, error)
+	List(ctx context.Context, input models.ListTaskInput) (*models.PaginatedTasks, error)
 	GetByID(ctx context.Context, rawID string) (*models.Task, error)
 	Update(ctx context.Context, rawID string, input models.UpdateTaskInput) (*models.Task, error)
 	Delete(ctx context.Context, rawID string) error
@@ -73,18 +76,28 @@ func (service *taskService) Create(serviceContext context.Context, createTaskInp
 	return task, nil
 }
 
-func (service *taskService) List(serviceContext context.Context, listTaskInput models.ListTaskInput) ([]models.Task, error) {
-	filter, err := normalizeTaskFilter(listTaskInput)
+func (service *taskService) List(serviceContext context.Context, listTaskInput models.ListTaskInput) (*models.PaginatedTasks, error) {
+	listQuery, err := normalizeListTaskInput(listTaskInput)
 	if err != nil {
 		return nil, err
 	}
 
-	tasks, err := service.repository.List(serviceContext, filter)
+	listResult, err := service.repository.List(serviceContext, listQuery)
 	if err != nil {
 		return nil, fmt.Errorf("list tasks: %w", err)
 	}
 
-	return tasks, nil
+	totalPages := calculateTotalPages(listResult.TotalItems, listQuery.PageSize)
+
+	return &models.PaginatedTasks{
+		Items:        listResult.Items,
+		TotalItems:   listResult.TotalItems,
+		Page:         listQuery.Page,
+		PageSize:     listQuery.PageSize,
+		TotalPages:   totalPages,
+		PreviousPage: calculatePreviousPage(listQuery.Page),
+		NextPage:     calculateNextPage(listQuery.Page, totalPages),
+	}, nil
 }
 
 func (service *taskService) GetByID(serviceContext context.Context, rawTaskID string) (*models.Task, error) {
@@ -150,6 +163,29 @@ func parseTaskID(rawTaskID string) (string, error) {
 	return taskID, nil
 }
 
+func normalizeListTaskInput(listTaskInput models.ListTaskInput) (models.TaskListQuery, error) {
+	filter, err := normalizeTaskFilter(listTaskInput)
+	if err != nil {
+		return models.TaskListQuery{}, err
+	}
+
+	page, err := normalizePage(listTaskInput.Page)
+	if err != nil {
+		return models.TaskListQuery{}, err
+	}
+
+	pageSize, err := normalizePageSize(listTaskInput.PageSize)
+	if err != nil {
+		return models.TaskListQuery{}, err
+	}
+
+	return models.TaskListQuery{
+		Filter:   filter,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
+}
+
 func normalizeTaskFilter(listTaskInput models.ListTaskInput) (models.TaskFilter, error) {
 	var filter models.TaskFilter
 
@@ -172,6 +208,34 @@ func normalizeTaskFilter(listTaskInput models.ListTaskInput) (models.TaskFilter,
 	}
 
 	return filter, nil
+}
+
+func normalizePage(rawPage int) (int, error) {
+	if rawPage == 0 {
+		return defaultTaskListPage, nil
+	}
+
+	if rawPage < 1 {
+		return 0, &ValidationError{Message: "page must be greater than or equal to 1"}
+	}
+
+	return rawPage, nil
+}
+
+func normalizePageSize(rawPageSize int) (int, error) {
+	if rawPageSize == 0 {
+		return defaultTaskPageSize, nil
+	}
+
+	if rawPageSize < 1 {
+		return 0, &ValidationError{Message: "page_size must be greater than or equal to 1"}
+	}
+
+	if rawPageSize > maxTaskPageSize {
+		return 0, &ValidationError{Message: fmt.Sprintf("page_size must be less than or equal to %d", maxTaskPageSize)}
+	}
+
+	return rawPageSize, nil
 }
 
 func normalizeUpdateInput(updateTaskInput models.UpdateTaskInput) (models.TaskUpdate, error) {
@@ -251,6 +315,32 @@ func parseTaskPriority(value string) (models.TaskPriority, error) {
 	default:
 		return "", &ValidationError{Message: "priority must be one of: low, medium, high"}
 	}
+}
+
+func calculateTotalPages(totalItems int64, pageSize int) int {
+	if totalItems == 0 {
+		return 0
+	}
+
+	return int((totalItems + int64(pageSize) - 1) / int64(pageSize))
+}
+
+func calculatePreviousPage(currentPage int) *int {
+	if currentPage <= 1 {
+		return nil
+	}
+
+	previousPage := currentPage - 1
+	return &previousPage
+}
+
+func calculateNextPage(currentPage int, totalPages int) *int {
+	if currentPage >= totalPages {
+		return nil
+	}
+
+	nextPage := currentPage + 1
+	return &nextPage
 }
 
 func parseDueDate(value string) (time.Time, error) {

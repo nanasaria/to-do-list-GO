@@ -58,17 +58,25 @@ func openAPISpec() map[string]any {
 							"type": "string",
 							"enum": []string{"low", "medium", "high"},
 						}),
+						queryParameter("page", "Numero da pagina. Padrao: 1", map[string]any{
+							"type":    "integer",
+							"minimum": 1,
+							"example": 1,
+						}),
+						queryParameter("page_size", "Quantidade de itens por pagina. Padrao: 10, maximo: 100", map[string]any{
+							"type":    "integer",
+							"minimum": 1,
+							"maximum": 100,
+							"example": 10,
+						}),
 					},
 					"responses": map[string]any{
 						"200": map[string]any{
-							"description": "Lista de tarefas",
+							"description": "Lista paginada de tarefas",
 							"content": map[string]any{
 								"application/json": map[string]any{
 									"schema": map[string]any{
-										"type": "array",
-										"items": map[string]any{
-											"$ref": "#/components/schemas/Task",
-										},
+										"$ref": "#/components/schemas/TaskListResponse",
 									},
 								},
 							},
@@ -186,6 +194,49 @@ func openAPISpec() map[string]any {
 						"updated_at": map[string]any{
 							"type":   "string",
 							"format": "date-time",
+						},
+					},
+				},
+				"TaskListResponse": map[string]any{
+					"type": "object",
+					"required": []string{
+						"items",
+						"total_items",
+						"page",
+						"page_size",
+						"total_pages",
+					},
+					"properties": map[string]any{
+						"items": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"$ref": "#/components/schemas/Task",
+							},
+						},
+						"total_items": map[string]any{
+							"type":    "integer",
+							"format":  "int64",
+							"example": 42,
+						},
+						"page": map[string]any{
+							"type":    "integer",
+							"example": 1,
+						},
+						"page_size": map[string]any{
+							"type":    "integer",
+							"example": 10,
+						},
+						"total_pages": map[string]any{
+							"type":    "integer",
+							"example": 5,
+						},
+						"previous_page": map[string]any{
+							"type":    "integer",
+							"example": 1,
+						},
+						"next_page": map[string]any{
+							"type":    "integer",
+							"example": 3,
 						},
 					},
 				},

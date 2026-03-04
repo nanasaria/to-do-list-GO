@@ -31,22 +31,39 @@ func (repository *MongoTaskRepository) Create(repositoryContext context.Context,
 	return nil
 }
 
-func (repository *MongoTaskRepository) List(repositoryContext context.Context, filter models.TaskFilter) ([]models.Task, error) {
-	cursor, err := repository.collection.Find(repositoryContext, buildTaskFilter(filter), options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
+func (repository *MongoTaskRepository) List(repositoryContext context.Context, query models.TaskListQuery) (models.TaskListResult, error) {
+	mongoFilter := buildTaskFilter(query.Filter)
+
+	totalItems, err := repository.collection.CountDocuments(repositoryContext, mongoFilter)
 	if err != nil {
-		return nil, fmt.Errorf("find tasks: %w", err)
+		return models.TaskListResult{}, fmt.Errorf("count tasks: %w", err)
+	}
+
+	if totalItems == 0 {
+		return models.TaskListResult{
+			Items:      []models.Task{},
+			TotalItems: 0,
+		}, nil
+	}
+
+	cursor, err := repository.collection.Find(repositoryContext, mongoFilter, buildListOptions(query.Page, query.PageSize))
+	if err != nil {
+		return models.TaskListResult{}, fmt.Errorf("find tasks: %w", err)
 	}
 
 	var tasks []models.Task
 	if err := cursor.All(repositoryContext, &tasks); err != nil {
-		return nil, fmt.Errorf("decode tasks: %w", err)
+		return models.TaskListResult{}, fmt.Errorf("decode tasks: %w", err)
 	}
 
 	if tasks == nil {
 		tasks = []models.Task{}
 	}
 
-	return tasks, nil
+	return models.TaskListResult{
+		Items:      tasks,
+		TotalItems: totalItems,
+	}, nil
 }
 
 func (repository *MongoTaskRepository) GetByID(repositoryContext context.Context, taskID string) (*models.Task, error) {
@@ -112,6 +129,16 @@ func buildTaskFilter(filter models.TaskFilter) bson.M {
 	}
 
 	return query
+}
+
+func buildListOptions(page int, pageSize int) *options.FindOptionsBuilder {
+	skip := int64((page - 1) * pageSize)
+	limit := int64(pageSize)
+
+	return options.Find().
+		SetSort(bson.D{{Key: "createdAt", Value: -1}}).
+		SetSkip(skip).
+		SetLimit(limit)
 }
 
 func buildTaskUpdate(taskUpdate models.TaskUpdate) bson.M {

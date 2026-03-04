@@ -48,11 +48,34 @@ type UpdateTaskInput struct {
 type ListTaskInput struct {
 	Status   string
 	Priority string
+	Page     int
+	PageSize int
 }
 
 type TaskFilter struct {
 	Status   *TaskStatus
 	Priority *TaskPriority
+}
+
+type TaskListQuery struct {
+	Filter   TaskFilter
+	Page     int
+	PageSize int
+}
+
+type TaskListResult struct {
+	Items      []Task
+	TotalItems int64
+}
+
+type PaginatedTasks struct {
+	Items        []Task
+	TotalItems   int64
+	Page         int
+	PageSize     int
+	TotalPages   int
+	PreviousPage *int
+	NextPage     *int
 }
 
 type TaskUpdate struct {

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +39,16 @@ type taskResponse struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type paginatedTaskResponse struct {
+	Items        []taskResponse `json:"items"`
+	TotalItems   int64          `json:"total_items"`
+	Page         int            `json:"page"`
+	PageSize     int            `json:"page_size"`
+	TotalPages   int            `json:"total_pages"`
+	PreviousPage *int           `json:"previous_page,omitempty"`
+	NextPage     *int           `json:"next_page,omitempty"`
+}
+
 func NewTaskController(service services.TaskService, logger *slog.Logger, requestTimeout time.Duration) *TaskController {
 	return &TaskController{
 		service:        service,
@@ -66,21 +77,35 @@ func (controller *TaskController) Create(responseWriter http.ResponseWriter, req
 }
 
 func (controller *TaskController) List(responseWriter http.ResponseWriter, request *http.Request) {
+	page, err := parseOptionalIntQuery(request.URL.Query().Get("page"), "page")
+	if err != nil {
+		controller.respondError(responseWriter, request, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	pageSize, err := parseOptionalIntQuery(request.URL.Query().Get("page_size"), "page_size")
+	if err != nil {
+		controller.respondError(responseWriter, request, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	requestContext, cancelRequest := controller.requestContext(request)
 	defer cancelRequest()
 
 	listTaskInput := models.ListTaskInput{
 		Status:   request.URL.Query().Get("status"),
 		Priority: request.URL.Query().Get("priority"),
+		Page:     page,
+		PageSize: pageSize,
 	}
 
-	tasks, err := controller.service.List(requestContext, listTaskInput)
+	taskPage, err := controller.service.List(requestContext, listTaskInput)
 	if err != nil {
 		controller.handleServiceError(responseWriter, request, err)
 		return
 	}
 
-	controller.respondJSON(responseWriter, request, http.StatusOK, toTaskResponses(tasks))
+	controller.respondJSON(responseWriter, request, http.StatusOK, toPaginatedTaskResponse(*taskPage))
 }
 
 func (controller *TaskController) GetByID(responseWriter http.ResponseWriter, request *http.Request) {
@@ -199,6 +224,20 @@ func decodeJSON(responseWriter http.ResponseWriter, request *http.Request, desti
 	return nil
 }
 
+func parseOptionalIntQuery(rawValue string, fieldName string) (int, error) {
+	trimmedValue := strings.TrimSpace(rawValue)
+	if trimmedValue == "" {
+		return 0, nil
+	}
+
+	parsedValue, err := strconv.Atoi(trimmedValue)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a valid integer", fieldName)
+	}
+
+	return parsedValue, nil
+}
+
 func (controller *TaskController) respondJSON(responseWriter http.ResponseWriter, request *http.Request, statusCode int, payload any) {
 	if err := writeJSON(responseWriter, statusCode, payload); err != nil {
 		controller.logResponseWriteError(request, statusCode, "failed to write JSON response", err)
@@ -276,4 +315,16 @@ func toTaskResponses(tasks []models.Task) []taskResponse {
 	}
 
 	return taskResponses
+}
+
+func toPaginatedTaskResponse(taskPage models.PaginatedTasks) paginatedTaskResponse {
+	return paginatedTaskResponse{
+		Items:        toTaskResponses(taskPage.Items),
+		TotalItems:   taskPage.TotalItems,
+		Page:         taskPage.Page,
+		PageSize:     taskPage.PageSize,
+		TotalPages:   taskPage.TotalPages,
+		PreviousPage: taskPage.PreviousPage,
+		NextPage:     taskPage.NextPage,
+	}
 }
