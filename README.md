@@ -80,6 +80,12 @@ curl "http://localhost:8080/tasks?status=pending&priority=high&page=1&page_size=
 }
 ```
 
+## Collection do Postman
+
+Colecao compartilhada para testar a API:
+
+[Abrir collection no Postman](https://nayara-ec9ace9e-307899.postman.co/workspace/Nayara-Nasaria%27s-Workspace~9cf6a391-10ca-4120-8a0a-921c270cf40f/collection/52886423-b8a31fce-e515-447b-ba6e-52061276b6d4?action=share&creator=52886423)
+
 ## Tecnologias
 
 - Go `1.25`
