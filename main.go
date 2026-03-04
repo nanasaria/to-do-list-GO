@@ -3,52 +3,74 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"to-do-list/internal/config"
+	"to-do-list/internal/controllers"
 	"to-do-list/internal/database"
 	"to-do-list/internal/handlers"
+	"to-do-list/internal/logger"
 	"to-do-list/internal/repositories"
 	"to-do-list/internal/server"
 	"to-do-list/internal/services"
 )
 
 func main() {
-	cfg := config.Load()
+	applicationConfig := config.Load()
+	appLogger := logger.New(applicationConfig.LogLevel, applicationConfig.LogFormat)
+	slog.SetDefault(appLogger)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	startupContext, cancelStartup := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelStartup()
 
-	client, err := database.Connect(ctx, cfg.MongoURI)
+	appLogger.Info("connecting to MongoDB",
+		"uri", applicationConfig.MongoURI,
+		"database", applicationConfig.MongoDatabase,
+		"collection", applicationConfig.MongoCollection,
+	)
+
+	mongoClient, err := database.Connect(startupContext, applicationConfig.MongoURI)
 	if err != nil {
-		log.Fatalf("failed to initialize MongoDB: %v", err)
+		appLogger.Error("failed to initialize MongoDB", "error", err)
+		os.Exit(1)
 	}
+	appLogger.Info("MongoDB connection established",
+		"database", applicationConfig.MongoDatabase,
+		"collection", applicationConfig.MongoCollection,
+	)
 	defer func() {
-		disconnectCtx, disconnectCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer disconnectCancel()
+		disconnectContext, cancelDisconnect := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelDisconnect()
 
-		if err := client.Disconnect(disconnectCtx); err != nil {
-			log.Printf("failed to disconnect MongoDB: %v", err)
+		if err := mongoClient.Disconnect(disconnectContext); err != nil {
+			appLogger.Error("failed to disconnect MongoDB", "error", err)
 		}
 	}()
 
-	todoRepository := repositories.NewMongoTodoRepository(client.Database(cfg.MongoDatabase), cfg.MongoCollection)
-	todoService := services.NewTodoService(todoRepository)
-	todoHandler := handlers.NewTodoHandler(todoService, 5*time.Second)
+	taskRepository := repositories.NewMongoTaskRepository(mongoClient.Database(applicationConfig.MongoDatabase), applicationConfig.MongoCollection)
+	taskService := services.NewTaskService(taskRepository)
+	taskController := controllers.NewTaskController(taskService, appLogger, 5*time.Second)
+	taskHandler := handlers.NewTaskHandler(taskController)
 
 	httpServer := &http.Server{
-		Addr:         cfg.HTTPAddress(),
-		Handler:      server.NewRouter(todoHandler),
+		Addr:         applicationConfig.HTTPAddress(),
+		Handler:      server.NewRouter(taskHandler, appLogger),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  30 * time.Second,
 	}
 
-	log.Printf("HTTP server listening on %s", cfg.HTTPAddress())
+	appLogger.Info("HTTP server listening",
+		"address", applicationConfig.HTTPAddress(),
+		"log_level", applicationConfig.LogLevel,
+		"log_format", applicationConfig.LogFormat,
+	)
 
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("server stopped with error: %v", err)
+		appLogger.Error("server stopped with error", "error", err)
+		os.Exit(1)
 	}
 }
