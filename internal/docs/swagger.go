@@ -128,17 +128,6 @@ func openAPISpec() map[string]any {
 						"409": errorResponse("Tarefa concluída não pode ser editada"),
 					},
 				},
-				"patch": map[string]any{
-					"summary":     "Atualizar parcialmente tarefa",
-					"operationId": "updateTaskPatch",
-					"requestBody": updateTaskRequestBody(),
-					"responses": map[string]any{
-						"200": successResponse("Tarefa atualizada", "#/components/schemas/Task"),
-						"400": errorResponse("Payload inválido"),
-						"404": errorResponse("Tarefa não encontrada"),
-						"409": errorResponse("Tarefa concluída não pode ser editada"),
-					},
-				},
 				"delete": map[string]any{
 					"summary":     "Deletar tarefa",
 					"operationId": "deleteTask",
