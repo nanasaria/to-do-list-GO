@@ -19,5 +19,6 @@ func (h *TaskHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /tasks", h.controller.Create)
 	mux.HandleFunc("GET /tasks/{id}", h.controller.GetByID)
 	mux.HandleFunc("PUT /tasks/{id}", h.controller.Update)
+	mux.HandleFunc("PATCH /tasks/{id}", h.controller.Update)
 	mux.HandleFunc("DELETE /tasks/{id}", h.controller.Delete)
 }
